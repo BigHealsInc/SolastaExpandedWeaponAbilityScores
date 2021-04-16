@@ -1,0 +1,9 @@
+﻿{
+	"Id": "SolastaExpandedWeaponAbilityScores",
+	"DisplayName": "SolastaExpandedWeaponAbilityScores",
+	"Author": "AdricLives",
+	"Version": "1.0.0",
+	"ManagerVersion": "0.23.3",
+	"AssemblyName": "SolastaExpandedWeaponAbilityScores.dll",
+	"EntryMethod": "SolastaExpandedWeaponAbilityScores.Main.Load"
+}
