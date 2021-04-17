@@ -85,8 +85,24 @@ namespace SolastaExpandedWeaponAbilityScores
         // ENTRY POINT IF YOU NEED SAFE DATABASE ACCESS
         static void ModAfterDBReady()
         {
-            var staff = DatabaseHelper.ItemDefinitions.Quarterstaff;
-            staff.WeaponDescription.WeaponTags.Add("Knowledge");
+            String weaponType;
+            ItemDefinition[] item_definitions = DatabaseRepository.GetDatabase<ItemDefinition>().GetAllElements();
+            foreach (ItemDefinition item_definition in item_definitions)
+            {
+                if (item_definition.IsWeapon)
+                {
+                    weaponType = item_definition.WeaponDescription.WeaponType;
+                    if (weaponType == "QuarterstaffType" || weaponType == "DaggerType" || weaponType == "ShortswordType")
+                        item_definition.WeaponDescription.WeaponTags.Add("Knowledge");
+                    if (weaponType == "ClubType" || weaponType == "MaceType" || weaponType == "SpearType")
+                        item_definition.WeaponDescription.WeaponTags.Add("Intuition");
+                    if (weaponType == "MorningstarType")
+                        item_definition.WeaponDescription.WeaponTags.Add("Vigor");
+                    // No Influence weapon types exist yet
+                    if (weaponType == "WhipType" || weaponType == "SickleType")
+                        item_definition.WeaponDescription.WeaponTags.Add("Influence");
+                }
+            }
         }
 
         [HarmonyPatch(typeof(RulesetCharacterHero), "RefreshAttackMode")]
