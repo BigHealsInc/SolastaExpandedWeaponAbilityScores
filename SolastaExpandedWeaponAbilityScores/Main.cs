@@ -46,7 +46,6 @@ namespace SolastaExpandedWeaponAbilityScores
                 }
             }
             String translation = LocalizationManager.GetTranslation("Tooltip/&TagKnowledgeTitle", overrideLanguage: null);
-            Console.WriteLine("Translation is: " + translation);
         }
 
         static bool Load(UnityModManager.ModEntry modEntry)
@@ -103,10 +102,7 @@ namespace SolastaExpandedWeaponAbilityScores
                 if (weaponDescription.WeaponTags.Contains("Finesse") && __instance.GetAttribute("Dexterity").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
                     __result.AbilityScore = "Dexterity";
                 if (weaponDescription.WeaponTags.Contains("Knowledge") && __instance.GetAttribute("Intelligence").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
-                {
                     __result.AbilityScore = "Intelligence";
-                }
-
                 if (weaponDescription.WeaponTags.Contains("Intuition") && __instance.GetAttribute("Wisdom").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
                     __result.AbilityScore = "Wisdom";
                 if (weaponDescription.WeaponTags.Contains("Vigor") && __instance.GetAttribute("Constitution").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
@@ -122,7 +118,8 @@ namespace SolastaExpandedWeaponAbilityScores
 
                 if (ability_score_to_hit_trend_index >= 0)
                 {
-                    __result.ToHitBonus = abilityScoreModifier;
+                    __result.ToHitBonus -= originalAbilityScoreModifier;
+                    __result.ToHitBonus += abilityScoreModifier;
                     __result.ToHitBonusTrends.RemoveAt(ability_score_to_hit_trend_index);
                     __result.ToHitBonusTrends.Add(new RuleDefinitions.TrendInfo(abilityScoreModifier, RuleDefinitions.FeatureSourceType.AbilityScore, __result.AbilityScore, (object)null));
                 }
