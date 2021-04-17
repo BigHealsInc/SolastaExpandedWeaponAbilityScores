@@ -39,12 +39,14 @@ namespace SolastaExpandedWeaponAbilityScores
                 foreach (var translationLanguage in (JObject)translationKey.Value)
                 {
                     var languageIndex = languageSourceData.GetLanguageIndex(translationLanguage.Key);
-                    if (languageIndex > 0)
+                    if (languageIndex >= 0)
                     {
                         languageSourceData.AddTerm(translationKey.Key).Languages[languageIndex] = translationLanguage.Value.ToString();
                     }
                 }
             }
+            String translation = LocalizationManager.GetTranslation("Tooltip/&TagKnowledgeTitle", overrideLanguage: null);
+            Console.WriteLine("Translation is: " + translation);
         }
 
         static bool Load(UnityModManager.ModEntry modEntry)

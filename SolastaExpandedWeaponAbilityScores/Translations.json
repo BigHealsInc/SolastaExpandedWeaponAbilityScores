@@ -1,9 +1,26 @@
 {
-    "SomeCategory/&SomeTerm": {
-      "English": "Mickey-Mouse was here"
+    "Equipment/&WeaponTagKnowledgeTitle": {
+      "English": "Knowledge"
     },
-    "OtherCategory/&OtherTerm": {
-      "English": "The book is on the table",
-      "Portuguese": "O livro esta sobre a mesa"
+    "Equipment/&WeaponTagIntuitionTitle": {
+      "English": "Intuition"
+    },
+    "Equipment/&WeaponTagVigorTitle": {
+      "English": "Vigor"
+    },
+    "Equipment/&WeaponTagInfluenceTitle": {
+      "English": "Influence"
+    },
+    "Tooltip/&TagKnowledgeTitle": {
+      "English": "Knowledge"
+    },
+    "Tooltip/&TagIntuitionTitle": {
+      "English": "Intuition"
+    },
+    "Tooltip/&TagVigorTitle": {
+      "English": "Vigor"
+    },
+    "Tooltip/&TagInfluenceTitle": {
+      "English": "Influence"
     }
 }
