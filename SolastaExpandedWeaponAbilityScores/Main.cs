@@ -7,7 +7,7 @@ using I2.Loc;
 using Newtonsoft.Json.Linq;
 using SolastaModApi;
 
-namespace SolastaDMUnlocked
+namespace SolastaExpandedWeaponAbilityScores
 {
     public class Main
     {
@@ -33,7 +33,7 @@ namespace SolastaDMUnlocked
         public static void LoadTranslations()
         {
             var languageSourceData = LocalizationManager.Sources[0];
-            var translations = JObject.Parse(File.ReadAllText(UnityModManager.modsPath + @"/SolastaDMUnlocked/Translations.json"));
+            var translations = JObject.Parse(File.ReadAllText(UnityModManager.modsPath + @"/SolastaExpandedWeaponAbilityScores/Translations.json"));
             foreach (var translationKey in translations)
             {
                 foreach (var translationLanguage in (JObject)translationKey.Value)
@@ -84,63 +84,60 @@ namespace SolastaDMUnlocked
         // ENTRY POINT IF YOU NEED SAFE DATABASE ACCESS
         static void ModAfterDBReady()
         {
-            UnlockEnemies();
-            UnlockTraps();
-            UnlockItems();
-            //UnlockLootPacks();
+            var staff = DatabaseHelper.ItemDefinitions.Quarterstaff;
+            staff.WeaponDescription.WeaponTags.Add("Knowledge");
         }
 
-        private static void UnlockEnemies()
+        [HarmonyPatch(typeof(RulesetCharacterHero), "RefreshAttackMode")]
+        class Patch
         {
-            // Should I address issue of certain monsters not having useful AI, like City Guards (defaultBattleDecisionPackage)
-            // Some monsters are causing a crash too, I should protect against this a bit - really seems to just be the Gargoyle which is missing its asset?
-            MonsterDefinition[] monster_definitions = DatabaseRepository.GetDatabase<MonsterDefinition>().GetAllElements();
-            foreach (MonsterDefinition monster_definition in monster_definitions)
+            static void Postfix(RulesetCharacterHero __instance, ref RulesetAttackMode __result, ref WeaponDescription weaponDescription)
             {
-                Traverse.Create((object)monster_definition).Field("inDungeonEditor").SetValue((object)true);
-            }
-        }
+                DamageForm firstDamageForm = __result.EffectDescription.FindFirstDamageForm();
+                WeaponTypeDefinition element = DatabaseRepository.GetDatabase<WeaponTypeDefinition>().GetElement(weaponDescription.WeaponType);
+                int originalAbilityScoreModifier = AttributeDefinitions.ComputeAbilityScoreModifier(__instance.Attributes[__result.AbilityScore].CurrentValue);
 
-        private static void UnlockLootPacks()
-        {
-            // Maybe not necessary, the lootpacks are all missing their GUI representation and don't offer much, would rather have a mod dedicated to DM loot packs
-            throw new NotImplementedException();
-        }
-
-        private static void UnlockItems()
-        {
-            ItemDefinition[] item_definitions = DatabaseRepository.GetDatabase<ItemDefinition>().GetAllElements();
-            foreach (ItemDefinition item_definition in item_definitions)
-            {
-                Traverse.Create((object)item_definition).Field("inDungeonEditor").SetValue((object)true);
-            }
-        }
-
-        private static void UnlockTraps()
-        {
-            String description;
-            String title;
-            EnvironmentEffectDefinition[] env_effect_definitions = DatabaseRepository.GetDatabase<EnvironmentEffectDefinition>().GetAllElements();
-            foreach (EnvironmentEffectDefinition env_effect_definition in env_effect_definitions)
-            {
-                description = env_effect_definition.GuiPresentation.Description;
-                title = env_effect_definition.GuiPresentation.Title;
-                if (title == "")
+                __result.AbilityScore = element.WeaponProximity == RuleDefinitions.AttackProximity.Melee ? "Strength" : "Dexterity";
+                if (weaponDescription.WeaponTags.Contains("Finesse") && __instance.GetAttribute("Dexterity").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
+                    __result.AbilityScore = "Dexterity";
+                if (weaponDescription.WeaponTags.Contains("Knowledge") && __instance.GetAttribute("Intelligence").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
                 {
-                    title = env_effect_definition.name;
-                    title = title.Replace("_", " ");
+                    __result.AbilityScore = "Intelligence";
                 }
-                if (description == "")
+
+                if (weaponDescription.WeaponTags.Contains("Intuition") && __instance.GetAttribute("Wisdom").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
+                    __result.AbilityScore = "Wisdom";
+                if (weaponDescription.WeaponTags.Contains("Vigor") && __instance.GetAttribute("Constitution").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
+                    __result.AbilityScore = "Constitution";
+                if (weaponDescription.WeaponTags.Contains("Influence") && __instance.GetAttribute("Charisma").CurrentValue > __instance.GetAttribute(__result.AbilityScore).CurrentValue)
+                    __result.AbilityScore = "Charisma";
+
+                int abilityScoreModifier = AttributeDefinitions.ComputeAbilityScoreModifier(__instance.Attributes[__result.AbilityScore].CurrentValue);
+
+                Predicate<RuleDefinitions.TrendInfo> predicate = FindAbilityScoreTrend;
+                int ability_score_to_hit_trend_index = __result.ToHitBonusTrends.FindIndex(predicate);
+                int ability_score_damage_bonus_trend_index = firstDamageForm.DamageBonusTrends.FindIndex(predicate);
+
+                if (ability_score_to_hit_trend_index >= 0)
                 {
-                    description = env_effect_definition.name;
-                    description = description.Replace("_", " ");
+                    __result.ToHitBonus = abilityScoreModifier;
+                    __result.ToHitBonusTrends.RemoveAt(ability_score_to_hit_trend_index);
+                    __result.ToHitBonusTrends.Add(new RuleDefinitions.TrendInfo(abilityScoreModifier, RuleDefinitions.FeatureSourceType.AbilityScore, __result.AbilityScore, (object)null));
                 }
-                GuiPresentationBuilder presentationBuilder = 
-                new GuiPresentationBuilder(description, title);
-                GuiPresentation guiPresentation = presentationBuilder.Build();
-                Traverse.Create((object)env_effect_definition).Field(nameof(guiPresentation)).SetValue((object)guiPresentation);
-                Traverse.Create((object)env_effect_definition).Field("inDungeonEditor").SetValue((object)true);
+
+                if (ability_score_damage_bonus_trend_index >= 0)
+                {
+                    firstDamageForm.DamageBonusTrends.RemoveAt(ability_score_damage_bonus_trend_index);
+                    firstDamageForm.BonusDamage -= originalAbilityScoreModifier;
+                    firstDamageForm.BonusDamage += abilityScoreModifier;
+                    firstDamageForm.DamageBonusTrends.Add(new RuleDefinitions.TrendInfo(abilityScoreModifier, RuleDefinitions.FeatureSourceType.AbilityScore, __result.AbilityScore, (object)null));
+                }
             }
+        }
+
+        private static bool FindAbilityScoreTrend(RuleDefinitions.TrendInfo trend)
+        {
+            return trend.sourceType == RuleDefinitions.FeatureSourceType.AbilityScore;
         }
     }
 }
