@@ -6,11 +6,16 @@ using HarmonyLib;
 using I2.Loc;
 using Newtonsoft.Json.Linq;
 using SolastaModApi;
+using System.Linq;
+using UnityEngine;
+using System.Collections.Generic;
 
 namespace SolastaExpandedWeaponAbilityScores
 {
     public class Main
     {
+        public static Guid ModGuidNamespace = new Guid("00c6789d-2fc7-4623-a854-b37cd2f3b07f");
+
         // [System.Diagnostics.Conditional("DEBUG")]
         public static void Log(string msg)
         {
@@ -45,7 +50,6 @@ namespace SolastaExpandedWeaponAbilityScores
                     }
                 }
             }
-            String translation = LocalizationManager.GetTranslation("Tooltip/&TagKnowledgeTitle", overrideLanguage: null);
         }
 
         static bool Load(UnityModManager.ModEntry modEntry)
@@ -85,23 +89,34 @@ namespace SolastaExpandedWeaponAbilityScores
         // ENTRY POINT IF YOU NEED SAFE DATABASE ACCESS
         static void ModAfterDBReady()
         {
-            String weaponType;
-            ItemDefinition[] item_definitions = DatabaseRepository.GetDatabase<ItemDefinition>().GetAllElements();
-            foreach (ItemDefinition item_definition in item_definitions)
+            WeaponTypeDefinitionCopyBuilder(DatabaseHelper.WeaponTypeDefinitions.ShortswordType, "WhipType", "SimpleWeaponCategory");
+            WeaponTypeDefinitionCopyBuilder(DatabaseHelper.WeaponTypeDefinitions.ShortswordType, "SickleType", "SimpleWeaponCategory");
+
+            foreach (WeaponTypeDefinition wtd in DatabaseRepository.GetDatabase<WeaponTypeDefinition>().GetAllElements())
             {
-                if (item_definition.IsWeapon)
-                {
-                    weaponType = item_definition.WeaponDescription.WeaponType;
-                    if (weaponType == "QuarterstaffType" || weaponType == "DaggerType" || weaponType == "ShortswordType")
-                        item_definition.WeaponDescription.WeaponTags.Add("Knowledge");
-                    if (weaponType == "ClubType" || weaponType == "MaceType" || weaponType == "SpearType")
-                        item_definition.WeaponDescription.WeaponTags.Add("Intuition");
-                    if (weaponType == "MorningstarType")
-                        item_definition.WeaponDescription.WeaponTags.Add("Vigor");
-                    // No Influence weapon types exist yet
-                    if (weaponType == "WhipType" || weaponType == "SickleType")
-                        item_definition.WeaponDescription.WeaponTags.Add("Influence");
-                }
+                Console.WriteLine(wtd.name);
+            }
+
+            List<string> whipWeaponTags = new List<string>() { "Finesse" };
+            List<string> sickleWeaponTags = new List<string>() { "Light" };
+
+            ItemDefinitionCopyBuilder(DatabaseHelper.ItemDefinitions.Shortsword, "Whip", "WhipType", whipWeaponTags);
+            ItemDefinitionCopyBuilder(DatabaseHelper.ItemDefinitions.Shortsword, "Sickle", "SickleType", sickleWeaponTags);
+
+            String weaponType;
+            var allWeapons = DatabaseRepository.GetDatabase<ItemDefinition>().GetAllElements().Where<ItemDefinition>(o => o.IsWeapon == true);
+            foreach (ItemDefinition weapon in allWeapons)
+            {
+                weaponType = weapon.WeaponDescription.WeaponType;
+                if (weaponType == "QuarterstaffType" || weaponType == "DaggerType" || weaponType == "ShortswordType")
+                    weapon.WeaponDescription.WeaponTags.Add("Knowledge");
+                if (weaponType == "ClubType" || weaponType == "MaceType" || weaponType == "SpearType")
+                    weapon.WeaponDescription.WeaponTags.Add("Intuition");
+                if (weaponType == "MorningstarType")
+                    weapon.WeaponDescription.WeaponTags.Add("Vigor");
+                if (weaponType == "WhipType" || weaponType == "SickleType")
+                    Console.WriteLine("!!!Adding Influence Weapon!!!");
+                    weapon.WeaponDescription.WeaponTags.Add("Influence");
             }
         }
 
@@ -153,6 +168,75 @@ namespace SolastaExpandedWeaponAbilityScores
         private static bool FindAbilityScoreTrend(RuleDefinitions.TrendInfo trend)
         {
             return trend.sourceType == RuleDefinitions.FeatureSourceType.AbilityScore;
+        }
+
+        private static void WeaponTypeDefinitionCopyBuilder(WeaponTypeDefinition sourceWeaponTypeDefinition, string name, string weaponCategory)
+        {
+            Guid newGuid = GuidHelper.Create(ModGuidNamespace, name);
+            WeaponTypeDefinition builtWeaponTypeDefinition = ScriptableObject.CreateInstance<WeaponTypeDefinition>();
+
+            Traverse.Create(builtWeaponTypeDefinition).Field("weaponCategory").SetValue(weaponCategory);
+            Traverse.Create(builtWeaponTypeDefinition).Field("name").SetValue(name);
+            builtWeaponTypeDefinition.name = name;
+            Traverse.Create(builtWeaponTypeDefinition).Field("isAttachedToBone").SetValue(sourceWeaponTypeDefinition.IsAttachedToBone);
+            Traverse.Create(builtWeaponTypeDefinition).Field("animationTag").SetValue(sourceWeaponTypeDefinition.AnimationTag);
+            Traverse.Create(builtWeaponTypeDefinition).Field("soundEffectDescription").SetValue(sourceWeaponTypeDefinition.SoundEffectDescription);
+            Traverse.Create(builtWeaponTypeDefinition).Field("soundEffectOnHitDescription").SetValue(sourceWeaponTypeDefinition.SoundEffectOnHitDescription);
+            Traverse.Create(builtWeaponTypeDefinition).Field("MeleeAttackerParticle").SetValue(sourceWeaponTypeDefinition.MeleeAttackerParticle);
+            Traverse.Create(builtWeaponTypeDefinition).Field("MeleeImpactParticle").SetValue(sourceWeaponTypeDefinition.MeleeImpactParticle);
+            Traverse.Create(builtWeaponTypeDefinition).Field("ThrowAttackerParticle").SetValue(sourceWeaponTypeDefinition.ThrowAttackerParticle);
+            Traverse.Create(builtWeaponTypeDefinition).Field("ThrowImpactParticle").SetValue(sourceWeaponTypeDefinition.ThrowImpactParticle);
+            Traverse.Create(builtWeaponTypeDefinition).Field("guiPresentation").SetValue(sourceWeaponTypeDefinition.GuiPresentation);
+            Traverse.Create(builtWeaponTypeDefinition).Field("guid").SetValue(newGuid.ToString());
+            DatabaseRepository.GetDatabase<WeaponTypeDefinition>().Add(builtWeaponTypeDefinition);
+        }
+
+        private static void ItemDefinitionCopyBuilder(ItemDefinition sourceItemDefinition, string name, string weaponType, List<string> weaponTags)
+        {
+            Guid newGuid = GuidHelper.Create(ModGuidNamespace, name);
+            ItemDefinition builtItemDefinition = ScriptableObject.CreateInstance<ItemDefinition>();
+
+            Traverse.Create(builtItemDefinition).Field("name").SetValue(name);
+            WeaponDescription sourceWeaponDescription = (WeaponDescription)Traverse.Create(sourceItemDefinition).Field("weaponDefinition").GetValue();
+            Traverse.Create(sourceWeaponDescription).Field("weaponType").SetValue(weaponType);
+            Traverse.Create(sourceWeaponDescription).Field("weaponTags").SetValue(weaponTags);
+
+            builtItemDefinition.name = name;
+            Traverse.Create(builtItemDefinition).Field("inDungeonEditor").SetValue(sourceItemDefinition.InDungeonEditor);
+            Traverse.Create(builtItemDefinition).Field("merchantCategory").SetValue(sourceItemDefinition.MerchantCategory);
+            Traverse.Create(builtItemDefinition).Field("weight").SetValue(sourceItemDefinition.Weight);
+            Traverse.Create(builtItemDefinition).Field("slotTypes").SetValue(sourceItemDefinition.SlotTypes);
+            Traverse.Create(builtItemDefinition).Field("slotsWhereActive").SetValue(sourceItemDefinition.SlotsWhereActive);
+            Traverse.Create(builtItemDefinition).Field("forceEquipSlot").SetValue(sourceItemDefinition.ForceEquipSlot);
+            Traverse.Create(builtItemDefinition).Field("stackSize").SetValue(sourceItemDefinition.StackSize);
+            Traverse.Create(builtItemDefinition).Field("defaultStackCount").SetValue(sourceItemDefinition.DefaultStackCount);
+            Traverse.Create(builtItemDefinition).Field("costs").SetValue(sourceItemDefinition.Costs);
+            Traverse.Create(builtItemDefinition).Field("itemTags").SetValue(sourceItemDefinition.ItemTags);
+            Traverse.Create(builtItemDefinition).Field("activeTags").SetValue(sourceItemDefinition.ActiveTags);
+            Traverse.Create(builtItemDefinition).Field("inactiveTags").SetValue(sourceItemDefinition.InactiveTags);
+            Traverse.Create(builtItemDefinition).Field("requiredAttunementClasses").SetValue(sourceItemDefinition.RequiredAttunementClasses);
+            Traverse.Create(builtItemDefinition).Field("staticProperties").SetValue(sourceItemDefinition.StaticProperties);
+            Traverse.Create(builtItemDefinition).Field("armorDefinition").SetValue(sourceItemDefinition.ArmorDescription);
+            Traverse.Create(builtItemDefinition).Field("isWeapon").SetValue(sourceItemDefinition.IsWeapon);
+            Traverse.Create(builtItemDefinition).Field("ammunitionDefinition").SetValue(sourceItemDefinition.AmmunitionDescription);
+            Traverse.Create(builtItemDefinition).Field("usableDeviceDescription").SetValue(sourceItemDefinition.UsableDeviceDescription);
+            Traverse.Create(builtItemDefinition).Field("toolDefinition").SetValue(sourceItemDefinition.ToolDescription);
+            Traverse.Create(builtItemDefinition).Field("starterPackDefinition").SetValue(sourceItemDefinition.StarterPackDescription);
+            Traverse.Create(builtItemDefinition).Field("containerItemDefinition").SetValue(sourceItemDefinition.ContainerItemDescription);
+            Traverse.Create(builtItemDefinition).Field("lightSourceItemDefinition").SetValue(sourceItemDefinition.LightSourceItemDescription);
+            Traverse.Create(builtItemDefinition).Field("focusItemDefinition").SetValue(sourceItemDefinition.FocusItemDescription);
+            Traverse.Create(builtItemDefinition).Field("wealthPileDefinition").SetValue(sourceItemDefinition.WealthPileDescription);
+            Traverse.Create(builtItemDefinition).Field("spellbookDefinition").SetValue(sourceItemDefinition.SpellbookDescription);
+            Traverse.Create(builtItemDefinition).Field("documentDescription").SetValue(sourceItemDefinition.DocumentDescription);
+            Traverse.Create(builtItemDefinition).Field("foodDescription").SetValue(sourceItemDefinition.FoodDescription);
+            Traverse.Create(builtItemDefinition).Field("factionRelicDescription").SetValue(sourceItemDefinition.FactionRelicDescription);
+            Traverse.Create(builtItemDefinition).Field("personalityFlagOccurences").SetValue(sourceItemDefinition.PersonalityFlagOccurences);
+            Traverse.Create(builtItemDefinition).Field("soundEffectDescriptionOverride").SetValue(sourceItemDefinition.SoundEffectDescription);
+            Traverse.Create(builtItemDefinition).Field("soundEffectOnHitDescriptionOverride").SetValue(sourceItemDefinition.SoundEffectOnHitDescription);
+            Traverse.Create(builtItemDefinition).Field("itemPresentation").SetValue(sourceItemDefinition.ItemPresentation);
+            Traverse.Create(builtItemDefinition).Field("guiPresentation").SetValue(sourceItemDefinition.GuiPresentation);
+            Traverse.Create(builtItemDefinition).Field("guid").SetValue(newGuid.ToString());
+            DatabaseRepository.GetDatabase<ItemDefinition>().Add(builtItemDefinition);
         }
     }
 }
